@@ -1,5 +1,8 @@
 use argh::FromArgs;
-use mahou::finder::{self, EpisodeNumber};
+use mahou::{
+    downloader,
+    finder::{self, EpisodeNumber},
+};
 use std::error::Error;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -17,12 +20,12 @@ struct Args {
     #[argh(option, short = 'e')]
     episode: Option<EpisodeNumber>,
 
-    /// download directory
-    #[argh(option, short = 'd')]
-    directory: Option<String>,
+    /// download directory. Defaults to current directory
+    #[argh(option, short = 'd', default = "\"./\".to_string()")]
+    directory: String,
 
-    /// preferred resolution
-    #[argh(option, short = 'r', default = "String::from(\"1080p\")")]
+    /// preferred resolution. Defaults to 1080p
+    #[argh(option, short = 'r', default = "\"1080p\".to_string()")]
     res: String,
 }
 
@@ -51,6 +54,10 @@ fn main() -> Result<()> {
     };
 
     let results = finder::Query::new(search, args.res, episode).find(&finder::Nibl::default())?;
+    let finder::FindResult {
+        irc_config,
+        entries,
+    } = results;
 
     // - Current user input, filter value
     // - Current option being evaluated, with type preserved
@@ -59,16 +66,14 @@ fn main() -> Result<()> {
     let filter = &|input: &str, _: &finder::Entry, entry: &str, _: usize| {
         let entry = entry.to_lowercase();
         let input = input.to_lowercase();
-        input
-            .split_whitespace()
-            .all(|word| entry.contains(word))
+        input.split_whitespace().all(|word| entry.contains(word))
     };
 
-    let selected = inquire::Select::new("Pick an episode", results)
+    let selected = inquire::Select::new("Pick an episode", entries)
         .with_filter(filter)
         .prompt()?;
 
-    println!("{selected:?}");
+    downloader::download(&selected, irc_config, args.directory)?;
 
     Ok(())
 }

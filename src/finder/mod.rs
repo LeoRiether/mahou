@@ -18,11 +18,19 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+//////////////////////////////////////////////////////
+//                    FindResult                    //
+//////////////////////////////////////////////////////
+pub struct FindResult {
+    pub irc_config: crate::downloader::irc::Config,
+    pub entries: Vec<Entry>,
+}
+
 //////////////////////////////////////////////////
 //                    Finder                    //
 //////////////////////////////////////////////////
 pub trait Finder {
-    fn find(&self, query: &Query) -> Result<Vec<Entry>>;
+    fn find(&self, query: &Query) -> Result<FindResult>;
 }
 
 /////////////////////////////////////////////////////////
@@ -72,20 +80,15 @@ pub struct Query {
 
 impl Query {
     pub fn new(search: String, resolution: String, episode: EpisodeNumber) -> Self {
-        Self { search, resolution, episode }
-    }
-
-    pub fn find<F: Finder>(&self, finder: &F) -> Result<Vec<Entry>> {
-        finder.find(self)
-    }
-
-    pub fn find_many(&self, finders: &[Box<dyn Finder>]) -> Result<Vec<Entry>> {
-        // TODO: figure out how to do this with an iterator chain
-        let mut entries = Vec::new();
-        for finder in finders {
-            entries.append(&mut finder.find(self)?);
+        Self {
+            search,
+            resolution,
+            episode,
         }
-        Ok(entries)
+    }
+
+    pub fn find<F: Finder>(&self, finder: &F) -> Result<FindResult> {
+        finder.find(self)
     }
 }
 

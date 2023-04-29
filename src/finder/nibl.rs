@@ -1,7 +1,9 @@
-use std::collections::HashMap;
-
 use super::{EpisodeNumber, Error, Finder, Result};
+use crate::downloader::irc;
+use lazy_static::lazy_static;
+use rand::prelude::*;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Nibl {
@@ -10,46 +12,16 @@ pub struct Nibl {
 
 pub const API_BASE: &str = "https://api.nibl.co.uk/nibl";
 
-impl Nibl {
-    pub fn search_packages(&self, query: &super::Query) -> Result<Vec<Package>> {
-        let mut url = format!(
-            "{}/search?query={}%20{}",
-            API_BASE, query.search, query.resolution
-        );
-        if let EpisodeNumber::Number(episode) = query.episode {
-            url += &format!("&episodeNumber={}", episode);
-        }
-
-        let response = self.client.get(&url).send()?;
-        let search_result: SearchResult = response.json()?;
-        if search_result.status != "OK" {
-            return Err(Error::APIError {
-                api: "nibl",
-                message: search_result.message,
-            });
-        }
-        Ok(search_result.content)
-    }
-
-    fn get_bots(&self) -> Result<HashMap<i64, Bot>> {
-        let response = self.client.get(format!("{}/bots", API_BASE)).send()?;
-        let result: BotList = response.json()?;
-        if result.status != "OK" {
-            return Err(Error::APIError {
-                api: "nibl",
-                message: result.message,
-            });
-        }
-        Ok(result
-            .content
-            .into_iter()
-            .map(|bot| (bot.id, bot))
-            .collect())
-    }
+lazy_static! {
+    pub static ref NIBL_CONFIG: irc::Config = irc::Config {
+        server: "irc.rizon.net:6667".into(),
+        channel: "#nibl".into(),
+        nickname: format!("real-person-{:x}", thread_rng().gen::<u32>()),
+    };
 }
 
 impl Finder for Nibl {
-    fn find(&self, query: &super::Query) -> Result<Vec<super::Entry>> {
+    fn find(&self, query: &super::Query) -> Result<super::FindResult> {
         let packages = self.search_packages(query)?;
         let bots = self.get_bots()?;
 
@@ -76,10 +48,53 @@ impl Finder for Nibl {
             size: p.size,
         };
 
-        Ok(packages
+        let entries: Vec<super::Entry> = packages
             .into_iter()
             .filter(filter_episode)
             .map(make_entry)
+            .collect();
+
+        Ok(super::FindResult {
+            irc_config: NIBL_CONFIG.clone(),
+            entries,
+        })
+    }
+}
+
+impl Nibl {
+    pub fn search_packages(&self, query: &super::Query) -> Result<Vec<Package>> {
+        let mut url = format!(
+            "{}/search?query={}%20{}",
+            API_BASE, query.search, query.resolution
+        );
+        if let EpisodeNumber::Number(episode) = query.episode {
+            url += &format!("&episodeNumber={}", episode);
+        }
+
+        let response = self.client.get(&url).send()?;
+        let search_result: SearchResult = response.json()?;
+        if search_result.status != "OK" {
+            return Err(Error::APIError {
+                api: "nibl",
+                message: search_result.message,
+            });
+        }
+        Ok(search_result.content)
+    }
+
+    pub fn get_bots(&self) -> Result<HashMap<i64, Bot>> {
+        let response = self.client.get(format!("{}/bots", API_BASE)).send()?;
+        let result: BotList = response.json()?;
+        if result.status != "OK" {
+            return Err(Error::APIError {
+                api: "nibl",
+                message: result.message,
+            });
+        }
+        Ok(result
+            .content
+            .into_iter()
+            .map(|bot| (bot.id, bot))
             .collect())
     }
 }
@@ -92,7 +107,7 @@ struct BotList {
 }
 
 #[derive(Deserialize)]
-struct Bot {
+pub struct Bot {
     id: i64,
     name: String,
 }
