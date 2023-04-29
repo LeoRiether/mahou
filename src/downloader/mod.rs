@@ -5,7 +5,7 @@ pub mod irc;
 use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, TcpStream};
 use std::path::Path;
 use std::str::from_utf8;
 use std::time::Duration;
@@ -58,7 +58,7 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
         };
 
         let style =
-            ProgressStyle::with_template("{spinner:.green} [{elapsed_precise} / ETA {eta}] [{wide_bar:.green/blue}] {bytes}/{total_bytes}")
+            ProgressStyle::with_template("{spinner:.green} [{elapsed_precise} / ETA {eta}] [{bar.40:.green/blue}] {bytes}/{total_bytes}")
                 .unwrap()
                 .with_key("eta", eta_key)
                 .progress_chars("█🭬 ");
@@ -85,6 +85,7 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
         let message = read_next_message(&mut stream, &mut message_buffer)?;
 
         if irc::PING_REGEX.is_match(&message) {
+            multibar.println(format!("< {}", message)).unwrap();
             multibar.println("Joining channel...").unwrap();
             let pong = message.replace("PING", "PONG");
             stream.write_all(pong.as_bytes())?;
@@ -95,6 +96,7 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
             }
         }
         if irc::JOIN_REGEX.is_match(&message) {
+            multibar.println(format!("< {}", message)).unwrap();
             for package in &request.packages {
                 multibar
                     .println(format!("Starting download of package #{}", package))
@@ -104,6 +106,7 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
             }
         }
         if irc::DCC_SEND_REGEX.is_match(&message) {
+            multibar.println(format!("< {}", message)).unwrap();
             let directory = request.directory.to_owned();
             let request = parse_dcc_send(&message);
             let bar = multibar.add(new_progressbar(request.file_size as u64));
@@ -149,12 +152,22 @@ fn read_next_message(stream: &mut TcpStream, message_builder: &mut String) -> Re
 
 fn parse_dcc_send(message: &str) -> irc::DCCSend {
     let captures = irc::DCC_SEND_REGEX.captures(message).unwrap();
-    let ip_number = captures[2].parse::<u32>().unwrap();
+    let ip = match (captures.get(2), captures.get(3)) {
+        (Some(v4), _) => {
+            let ip = v4.as_str().parse::<u32>().unwrap();
+            IpAddr::from(Ipv4Addr::from(ip))
+        }
+        (_, Some(v6)) => {
+            let ip = v6.as_str().parse::<Ipv6Addr>().unwrap();
+            IpAddr::from(ip)
+        }
+        _ => panic!("No IP found in DCC SEND message"),
+    };
     irc::DCCSend {
         filename: captures[1].to_string(),
-        ip: IpAddr::V4(Ipv4Addr::from(ip_number)),
-        port: captures[3].to_string(),
-        file_size: captures[4].parse::<usize>().unwrap(),
+        ip,
+        port: captures[4].to_string(),
+        file_size: captures[5].parse::<usize>().unwrap(),
     }
 }
 
