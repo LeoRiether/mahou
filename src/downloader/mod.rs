@@ -68,7 +68,10 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
     };
 
     multibar
-        .println(format!("Connecting to {}...", request.config.server))
+        .println(format!(
+            "Connecting to {}... (your username is {} :)",
+            request.config.server, request.config.nickname
+        ))
         .unwrap();
 
     let mut download_handles = Vec::new();
@@ -165,9 +168,8 @@ fn download_file(
         .map_err(|e| Error::FileCreation(path.to_string_lossy().to_string(), e))?;
 
     let ip = format!("{}:{}", request.ip, request.port);
-    bar.println(format!("~ connecting to {}", ip));
-    let mut stream = TcpStream::connect(ip)
-        .map_err(Error::Connection)?;
+    bar.println(format!("~ downloading {} from {}", request.filename, ip));
+    let mut stream = TcpStream::connect(ip).map_err(Error::Connection)?;
 
     let mut buffer = [0; 8192];
     let mut bytes: usize = 0;
