@@ -50,6 +50,7 @@ impl std::str::FromStr for EpisodeNumber {
     fn from_str(s: &str) -> StdResult<Self, Self::Err> {
         match s {
             "latest" => Ok(Self::Latest),
+            "all" => Ok(Self::All),
             _ => s
                 .parse::<i32>()
                 .map(Self::Number)
