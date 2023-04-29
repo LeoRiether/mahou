@@ -7,12 +7,11 @@ use std::error::Error;
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-/// Mahou -- magically easy anime downloader
-///
-/// Try not using any options for an interactive prompt :)
+/// Mahou -- magically easy anime downloader.
+/// If --search or --episode are missing, mahou will interactively prompt for them.
 #[derive(Debug, FromArgs)]
 struct Args {
-    /// the query to search for
+    /// the show you want to search for
     #[argh(option, short = 's')]
     search: Option<String>,
 
@@ -20,7 +19,7 @@ struct Args {
     #[argh(option, short = 'e')]
     episode: Option<EpisodeNumber>,
 
-    /// download directory. Defaults to current directory
+    /// directory for the downloaded file. Defaults to current directory
     #[argh(option, short = 'd', default = "\"./\".to_string()")]
     directory: String,
 
@@ -32,7 +31,7 @@ struct Args {
     #[argh(option, short = 'f')]
     filter: Option<String>,
 
-    /// download first result instead of prompting to pick a result
+    /// download the first result instead of prompting to pick one
     #[argh(switch)]
     download_first: bool,
 }
