@@ -2,13 +2,13 @@
 /// Error handling is kind of whack...
 pub mod irc;
 
-use pbr::{MultiBar, Pipe, ProgressBar, Units};
+use indicatif::{MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpStream};
 use std::path::Path;
 use std::str::from_utf8;
-use std::thread;
+use std::{fmt, thread};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -39,9 +39,18 @@ pub fn download(
 }
 
 fn connect_and_download(request: irc::Request) -> Result<()> {
+    let multibar = MultiProgress::new();
+    let new_progressbar = |total_bytes: u64| {
+        let pb = ProgressBar::new(total_bytes);
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+        .unwrap()
+        .with_key("eta", |state: &ProgressState, w: &mut dyn fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
+        .progress_chars("#>-"));
+        pb
+    };
+
     let mut download_handles = Vec::new();
     let mut has_joined = false;
-    let multi_bar = MultiBar::new();
     let mut stream = log_in(&request)?;
 
     let mut message_buffer = String::new();
@@ -66,15 +75,13 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
         if irc::DCC_SEND_REGEX.is_match(&message) {
             let directory = request.directory.to_owned();
             let request = parse_dcc_send(&message);
-            let mut progress_bar = multi_bar.create_bar(request.file_size as u64);
-            let handle =
-                thread::spawn(move || download_file(request, &mut progress_bar, directory));
+            let bar = multibar.add(new_progressbar(request.file_size as u64));
+            let handle = thread::spawn(move || download_file(request, bar, directory));
             download_handles.push(handle);
         }
     }
     stream.write_all("QUIT :my job is done here!\r\n".as_bytes())?;
     stream.shutdown(Shutdown::Both).unwrap();
-    multi_bar.listen();
     download_handles.into_iter().try_for_each(|handle| {
         handle
             .join()
@@ -122,7 +129,7 @@ fn parse_dcc_send(message: &str) -> irc::DCCSend {
 
 fn download_file(
     request: irc::DCCSend,
-    progress_bar: &mut ProgressBar<Pipe>,
+    bar: ProgressBar,
     directory: impl AsRef<Path>,
 ) -> Result<()> {
     let path = directory.as_ref().join(&request.filename);
@@ -132,17 +139,15 @@ fn download_file(
         .map_err(Error::Connection)?;
     let mut buffer = [0; 8192];
 
-    let mut progress: usize = 0;
-    progress_bar.set_units(Units::Bytes);
-    progress_bar.message(&format!("{}: ", &request.filename));
+    let mut bytes: usize = 0;
 
-    while progress < request.file_size {
+    while bytes < request.file_size {
         let count = stream.read(&mut buffer[..])?;
         file.write_all(&buffer[..count])?;
-        progress += count;
-        progress_bar.set(progress as u64);
+        bytes += count;
+        bar.set_position(bytes as u64);
     }
-    progress_bar.finish();
+    bar.finish_with_message(format!("Done downloading {}", request.filename));
     stream.shutdown(Shutdown::Both)?;
     file.flush()?;
     Ok(())

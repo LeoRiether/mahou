@@ -13,7 +13,7 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 #[derive(Debug, FromArgs)]
 struct Args {
     /// the query to search for
-    #[argh(option, short = 'q')]
+    #[argh(option, short = 's')]
     search: Option<String>,
 
     /// the episode to download
