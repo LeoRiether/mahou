@@ -5,19 +5,9 @@ use rand::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct Nibl {
     client: reqwest::blocking::Client,
-}
-
-impl Default for Nibl {
-    fn default() -> Self {
-        Self {
-            client: reqwest::blocking::Client::builder()
-                .use_rustls_tls()
-                .build()
-                .unwrap(),
-        }
-    }
 }
 
 pub const API_BASE: &str = "https://api.nibl.co.uk/nibl";
