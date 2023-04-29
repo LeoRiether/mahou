@@ -6,7 +6,7 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/LeoRiether/mahou"
 keywords = ["anime", "cli", "xdcc"]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,6 +19,6 @@ lazy_static = "1.4.0"
 owo-colors = "3.5.0"
 rand = "0.8"
 regex = "1.8"
-reqwest = { version = "0.11.17", features = ["blocking", "json"] }
+reqwest = { version = "0.11.17", features = ["blocking", "json", "rustls"] }
 serde = { version = "1.0.160", features = ["derive"] }
 thiserror = "1.0.40"
