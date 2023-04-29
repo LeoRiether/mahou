@@ -63,10 +63,10 @@ impl Finder for Nibl {
 
 impl Nibl {
     pub fn search_packages(&self, query: &super::Query) -> Result<Vec<Package>> {
-        let mut url = format!(
-            "{}/search?query={}%20{}",
-            API_BASE, query.search, query.resolution
-        );
+        let mut url = format!("{}/search?query={}", API_BASE, query.search);
+        if let Some(resolution) = &query.resolution {
+            url += &format!("%20{}", resolution);
+        }
         if let EpisodeNumber::Number(episode) = query.episode {
             url += &format!("&episodeNumber={}", episode);
         }

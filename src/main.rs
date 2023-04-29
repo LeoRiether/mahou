@@ -24,9 +24,9 @@ struct Args {
     #[argh(option, short = 'd', default = "\"./\".to_string()")]
     directory: String,
 
-    /// preferred resolution. Defaults to 1080p
-    #[argh(option, short = 'r', default = "\"1080p\".to_string()")]
-    res: String,
+    /// preferred resolution.
+    #[argh(option, short = 'r')]
+    res: Option<String>,
 }
 
 fn prompt_search() -> Result<String> {
@@ -58,6 +58,11 @@ fn main() -> Result<()> {
         irc_config,
         entries,
     } = results;
+
+    if entries.is_empty() {
+        println!("No results found :(");
+        return Ok(());
+    }
 
     // - Current user input, filter value
     // - Current option being evaluated, with type preserved

@@ -74,12 +74,12 @@ impl fmt::Display for EpisodeNumber {
 #[derive(Debug, Default, Clone, PartialEq, Hash)]
 pub struct Query {
     pub search: String,
-    pub resolution: String,
+    pub resolution: Option<String>,
     pub episode: EpisodeNumber,
 }
 
 impl Query {
-    pub fn new(search: String, resolution: String, episode: EpisodeNumber) -> Self {
+    pub fn new(search: String, resolution: Option<String>, episode: EpisodeNumber) -> Self {
         Self {
             search,
             resolution,

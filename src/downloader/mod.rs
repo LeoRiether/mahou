@@ -2,12 +2,13 @@
 /// Error handling is kind of whack...
 pub mod irc;
 
-use indicatif::{MultiProgress, ProgressBar, ProgressState, ProgressStyle};
+use indicatif::{HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpStream};
 use std::path::Path;
 use std::str::from_utf8;
+use std::time::Duration;
 use std::{fmt, thread};
 use thiserror::Error;
 
@@ -42,22 +43,46 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
     let multibar = MultiProgress::new();
     let new_progressbar = |total_bytes: u64| {
         let pb = ProgressBar::new(total_bytes);
-        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-        .unwrap()
-        .with_key("eta", |state: &ProgressState, w: &mut dyn fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
-        .progress_chars("#>-"));
+
+        // impossible to read:
+        let eta_key = |s: &ProgressState, w: &mut dyn fmt::Write| match (s.pos(), s.len()) {
+            (0, _) | (_, None) => write!(w, "-").unwrap(),
+            (pos, Some(len)) => write!(
+                w,
+                "{:#}",
+                HumanDuration(Duration::from_secs(
+                    s.elapsed().as_secs() * (len - pos) / pos
+                ))
+            )
+            .unwrap(),
+        };
+
+        let style =
+            ProgressStyle::with_template("{spinner:.green} [{elapsed_precise} / ETA {eta}] [{wide_bar:.green/blue}] {bytes}/{total_bytes}")
+                .unwrap()
+                .with_key("eta", eta_key)
+                .progress_chars("█🭬 ");
+
+        pb.set_style(style);
         pb
     };
+
+    multibar
+        .println(format!("Connecting to {}...", request.config.server))
+        .unwrap();
 
     let mut download_handles = Vec::new();
     let mut has_joined = false;
     let mut stream = log_in(&request)?;
+
+    multibar.println("Connected! Pinging server...").unwrap();
 
     let mut message_buffer = String::new();
     while download_handles.len() < request.packages.len() {
         let message = read_next_message(&mut stream, &mut message_buffer)?;
 
         if irc::PING_REGEX.is_match(&message) {
+            multibar.println("Joining channel...").unwrap();
             let pong = message.replace("PING", "PONG");
             stream.write_all(pong.as_bytes())?;
             if !has_joined {
@@ -68,6 +93,9 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
         }
         if irc::JOIN_REGEX.is_match(&message) {
             for package in &request.packages {
+                multibar
+                    .println(format!("Starting download of package #{}", package))
+                    .unwrap();
                 let xdcc_send_cmd = format!("PRIVMSG {} :xdcc send #{}\r\n", request.bot, package);
                 stream.write_all(xdcc_send_cmd.as_bytes())?;
             }
@@ -135,12 +163,14 @@ fn download_file(
     let path = directory.as_ref().join(&request.filename);
     let mut file = File::create(&path)
         .map_err(|e| Error::FileCreation(path.to_string_lossy().to_string(), e))?;
-    let mut stream = TcpStream::connect(format!("{}:{}", request.ip, request.port))
+
+    let ip = format!("{}:{}", request.ip, request.port);
+    bar.println(format!("~ connecting to {}", ip));
+    let mut stream = TcpStream::connect(ip)
         .map_err(Error::Connection)?;
+
     let mut buffer = [0; 8192];
-
     let mut bytes: usize = 0;
-
     while bytes < request.file_size {
         let count = stream.read(&mut buffer[..])?;
         file.write_all(&buffer[..count])?;
