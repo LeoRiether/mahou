@@ -57,10 +57,18 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
             .unwrap(),
         };
 
+        let percentage_key = |s: &ProgressState, w: &mut dyn fmt::Write| {
+            match s.len() {
+                Some(len) => write!(w, "{:.0}", 100.0 * s.pos() as f64 / len as f64).unwrap(),
+                None => write!(w, "-").unwrap(),
+            }
+        };
+
         let style =
-            ProgressStyle::with_template("{spinner:.green} [{elapsed_precise} / ETA {eta}] [{bar.40:.green/blue}] {bytes}/{total_bytes}")
+            ProgressStyle::with_template("{spinner:.green} [{elapsed_precise:.green} / ETA {eta:.green}] |{bar}| {bytes:.yellow}/{total_bytes:.yellow} ({percentage}%)")
                 .unwrap()
                 .with_key("eta", eta_key)
+                .with_key("percentage", percentage_key)
                 .progress_chars("█🭬 ");
 
         pb.set_style(style);
