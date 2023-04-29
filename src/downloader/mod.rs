@@ -57,11 +57,9 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
             .unwrap(),
         };
 
-        let percentage_key = |s: &ProgressState, w: &mut dyn fmt::Write| {
-            match s.len() {
-                Some(len) => write!(w, "{:.0}", 100.0 * s.pos() as f64 / len as f64).unwrap(),
-                None => write!(w, "-").unwrap(),
-            }
+        let percentage_key = |s: &ProgressState, w: &mut dyn fmt::Write| match s.len() {
+            Some(len) => write!(w, "{:.0}", 100.0 * s.pos() as f64 / len as f64).unwrap(),
+            None => write!(w, "-").unwrap(),
         };
 
         let style =
@@ -76,10 +74,7 @@ fn connect_and_download(request: irc::Request) -> Result<()> {
     };
 
     multibar
-        .println(format!(
-            "Connecting to {}... (your username is {} :)",
-            request.config.server, request.config.nickname
-        ))
+        .println(format!("Connecting to {}...", request.config.server))
         .unwrap();
 
     let mut download_handles = Vec::new();

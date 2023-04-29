@@ -27,6 +27,14 @@ struct Args {
     /// preferred resolution.
     #[argh(option, short = 'r')]
     res: Option<String>,
+
+    /// filter for the results
+    #[argh(option, short = 'f')]
+    filter: Option<String>,
+
+    /// download first result instead of prompting to pick a result
+    #[argh(switch)]
+    download_first: bool,
 }
 
 fn prompt_search() -> Result<String> {
@@ -38,6 +46,12 @@ fn prompt_episode() -> Result<EpisodeNumber> {
         .with_default(EpisodeNumber::Latest)
         .with_help_message("Enter a number, 'latest', or 'all' to show all available episodes")
         .prompt()?)
+}
+
+fn filter(words: &str, entry: &str) -> bool {
+    let entry = entry.to_lowercase();
+    let words = words.to_lowercase();
+    words.split_whitespace().all(|word| entry.contains(word))
 }
 
 fn main() -> Result<()> {
@@ -60,23 +74,47 @@ fn main() -> Result<()> {
     } = results;
 
     if entries.is_empty() {
-        println!("No results found :(");
+        eprintln!("No results found :(");
         return Ok(());
     }
 
-    // - Current user input, filter value
-    // - Current option being evaluated, with type preserved
-    // - String value of the current option
-    // - Index of the current option in the original list
-    let filter = &|input: &str, _: &finder::Entry, entry: &str, _: usize| {
-        let entry = entry.to_lowercase();
-        let input = input.to_lowercase();
-        input.split_whitespace().all(|word| entry.contains(word))
-    };
+    let selected = if args.download_first {
+        // Pick first entry
 
-    let selected = inquire::Select::new("Pick an episode", entries)
-        .with_filter(filter)
-        .prompt()?;
+        let first = entries.into_iter().find(|entry| {
+            if let Some(f) = &args.filter {
+                filter(f, &format!("{}", entry))
+            } else {
+                true
+            }
+        });
+
+        match first {
+            Some(entry) => entry,
+            None => {
+                eprintln!("No results found :(");
+                return Ok(());
+            }
+        }
+    } else {
+        // Prompt the user to pick an episode
+        
+        // - Current user input, filter value
+        // - Current option being evaluated, with type preserved
+        // - String value of the current option
+        // - Index of the current option in the original list
+        let inquire_filter = &|input: &str, _: &finder::Entry, entry: &str, _: usize| {
+            if let Some(f) = &args.filter {
+                filter(f, entry) && filter(input, entry)
+            } else {
+                filter(input, entry)
+            }
+        };
+
+        inquire::Select::new("Pick an episode", entries)
+            .with_filter(inquire_filter)
+            .prompt()?
+    };
 
     downloader::download(&selected, irc_config, args.directory)?;
 
