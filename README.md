@@ -2,9 +2,8 @@
 ## Magically easy anime downloader
 
 ## How to use
-~~Either download [the latest release](https://github.com/LeoRiether/mahou/releases/latest) and
-run the executable, or build it from source by running~~
-Releases are broken for now, you'll have to build it yourself:
+Either download [the latest release](https://github.com/LeoRiether/mahou/releases/latest) and
+run the executable, or build it from source by running
 
 ```bash
 cargo install mahou
