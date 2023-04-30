@@ -78,8 +78,12 @@ fn main() -> Result<()> {
     let results = finder::Query::new(search, args.res, episode).find(&finder::Nibl::default())?;
     let finder::FindResult {
         irc_config,
-        entries,
+        mut entries,
     } = results;
+
+    if let Some(f) = &args.filter {
+        entries.retain(|entry| filter(f, &format!("{}", entry)));
+    }
 
     if entries.is_empty() {
         eprintln!("No results found :(");
@@ -88,22 +92,7 @@ fn main() -> Result<()> {
 
     let selected = if args.download_first {
         // Pick first entry
-
-        let first = entries.into_iter().find(|entry| {
-            if let Some(f) = &args.filter {
-                filter(f, &format!("{}", entry))
-            } else {
-                true
-            }
-        });
-
-        match first {
-            Some(entry) => entry,
-            None => {
-                eprintln!("No results found :(");
-                return Ok(());
-            }
-        }
+        entries.swap_remove(0)
     } else {
         // Prompt the user to pick an episode
 
@@ -112,11 +101,7 @@ fn main() -> Result<()> {
         // - String value of the current option
         // - Index of the current option in the original list
         let inquire_filter = &|input: &str, _: &finder::Entry, entry: &str, _: usize| {
-            if let Some(f) = &args.filter {
-                filter(f, entry) && filter(input, entry)
-            } else {
-                filter(input, entry)
-            }
+            filter(input, entry)
         };
 
         inquire::Select::new("Pick an episode", entries)
