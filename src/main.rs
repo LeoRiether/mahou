@@ -44,6 +44,7 @@ fn prompt_episode() -> Result<EpisodeNumber> {
     Ok(inquire::CustomType::<EpisodeNumber>::new("Which episode?")
         .with_default(EpisodeNumber::Latest)
         .with_help_message("Enter a number, 'latest', or 'all' to show all available episodes")
+        .with_autocomplete(Autocompleter::from_saved_entries())
         .prompt()?)
 }
 

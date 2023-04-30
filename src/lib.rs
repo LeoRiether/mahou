@@ -2,3 +2,4 @@
 
 pub mod downloader;
 pub mod finder;
+pub mod autocompleter;
