@@ -1,5 +1,6 @@
 use argh::FromArgs;
 use mahou::{
+    autocompleter::{Autocompleter, EntrySet},
     downloader,
     finder::{self, EpisodeNumber},
 };
@@ -37,14 +38,21 @@ struct Args {
 }
 
 fn prompt_search() -> Result<String> {
-    Ok(inquire::Text::new("What show would you like to watch today?").prompt()?)
+    let show = inquire::Text::new("What show would you like to watch today?")
+        .with_autocomplete(Autocompleter::from_saved_entries())
+        .prompt()?;
+
+    if let Some(mut entryset) = EntrySet::from_disk() {
+        entryset.add(show.clone());
+    }
+
+    Ok(show)
 }
 
 fn prompt_episode() -> Result<EpisodeNumber> {
     Ok(inquire::CustomType::<EpisodeNumber>::new("Which episode?")
         .with_default(EpisodeNumber::Latest)
         .with_help_message("Enter a number, 'latest', or 'all' to show all available episodes")
-        .with_autocomplete(Autocompleter::from_saved_entries())
         .prompt()?)
 }
 
@@ -98,7 +106,7 @@ fn main() -> Result<()> {
         }
     } else {
         // Prompt the user to pick an episode
-        
+
         // - Current user input, filter value
         // - Current option being evaluated, with type preserved
         // - String value of the current option

@@ -536,7 +536,6 @@ dependencies = [
 name = "mahou"
 version = "0.1.2"
 dependencies = [
- "aho-corasick",
  "argh",
  "dirs",
  "indicatif",
